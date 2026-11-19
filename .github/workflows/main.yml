@@ -1,0 +1,79 @@
+
+name: AnyDesk Checker
+
+on:
+  workflow_dispatch:
+
+jobs:
+  secure-anydesk:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Check Existing AnyDesk
+        shell: powershell
+        run: |
+          $paths = @(
+            "$env:ProgramFiles\AnyDesk\AnyDesk.exe",
+            "${env:ProgramFiles(x86)}\AnyDesk\AnyDesk.exe",
+            "$env:LOCALAPPDATA\Programs\AnyDesk\AnyDesk.exe",
+            "$env:LOCALAPPDATA\AnyDesk\AnyDesk.exe"
+          )
+
+          $anydesk = $paths |
+            Where-Object { Test-Path $_ } |
+            Select-Object -First 1
+
+          if ($anydesk) {
+              Write-Host "AnyDesk já está instalado!"
+              Write-Host "Local: $anydesk"
+              "ANYDESK_PATH=$anydesk" |
+                Out-File -FilePath $env:GITHUB_ENV -Append
+          }
+          else {
+              Write-Host "::error::AnyDesk não está instalado!"
+              exit 1
+          }
+
+      - name: Verify AnyDesk
+        shell: powershell
+        run: |
+          $path = $env:ANYDESK_PATH
+
+          if (!(Test-Path $path)) {
+              Write-Host "::error::Executável do AnyDesk não encontrado!"
+              exit 1
+          }
+
+          $signature = Get-AuthenticodeSignature $path
+
+          if ($signature.Status -ne "Valid") {
+              Write-Host "::error::Assinatura do AnyDesk inválida!"
+              exit 1
+          }
+
+          Write-Host "AnyDesk verificado com sucesso!"
+
+      - name: Check AnyDesk Process
+        shell: powershell
+        run: |
+          $process = Get-Process -Name "AnyDesk" `
+            -ErrorAction SilentlyContinue
+
+          if ($process) {
+              Write-Host "AnyDesk está em execução!"
+          }
+          else {
+              Write-Host "::warning::AnyDesk não está em execução."
+          }
+
+      - name: Final Status
+        shell: powershell
+        run: |
+          Write-Host "============================"
+          Write-Host "       ANYDESK STATUS"
+          Write-Host "============================"
+          Write-Host "Verificação concluída."
+          Write-Host "Usuário de referência: Blnkj"
+          Write-Host "Credenciais não publicadas."
+          Write-Host "============================"
